@@ -1,12 +1,8 @@
 package com.stripe.herringbone.flatten
 
-import org.apache.hadoop.fs.Path
-import org.apache.hadoop.conf.Configuration
-
-import parquet.example.data.Group
-import parquet.example.data.GroupWriter
-import parquet.example.data.simple.SimpleGroup
-import parquet.schema.MessageType
+import org.apache.parquet.example.data.simple.SimpleGroup
+import org.apache.parquet.example.data.{Group, GroupWriter}
+import org.apache.parquet.schema.MessageType
 
 import scala.collection.JavaConversions._
 
@@ -28,14 +24,6 @@ object FlatConverter {
     fieldValues.mkString("\t")
   }
 
-  def constructHeader(schema: MessageType) = {
-    schema
-      .getPaths()
-      .toList
-      .map{_(0)}
-      .mkString("\t")
-  }
-
   def flattenGroup(group: Group, flatSchema: MessageType, separator: String, renameId: Boolean) = {
     var flatGroup = new SimpleGroup(flatSchema)
     val writer = new GroupWriter(new FlatConsumer(flatGroup, separator, renameId), group.getType)
@@ -50,5 +38,15 @@ object FlatConverter {
       quote + s.replace(quote, "\"\"") + quote
     else
       s
+  }
+
+  def constructHeader(schema: MessageType) = {
+    schema
+      .getPaths()
+      .toList
+      .map {
+        _ (0)
+      }
+      .mkString("\t")
   }
 }

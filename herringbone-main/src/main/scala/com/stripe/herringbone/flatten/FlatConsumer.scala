@@ -1,31 +1,23 @@
 package com.stripe.herringbone.flatten
 
-import org.apache.hadoop.mapreduce._
-import org.apache.hadoop.mapreduce.lib.input._
-import org.apache.hadoop.mapreduce.lib.output._
-import org.apache.hadoop.util._
-import org.apache.hadoop.fs._
-import org.apache.hadoop.conf._
-
-import parquet.example.data._
-import parquet.example.data.simple._
-import parquet.hadoop._
-import parquet.hadoop.example._
-import parquet.io.api._
-import parquet.schema._
+import org.apache.parquet.example.data._
+import org.apache.parquet.io.api._
+import org.apache.parquet.schema._
 
 class FlatConsumer(output: Group, separator: String, renameId: Boolean) extends RecordConsumer {
 
-  case class StackFrame(field: String, var values: List[Binary])
-  var stack = List[StackFrame]()
   // Impala stops working after a field becomes too long. The docs
   // indicate that we should have 32k. However, a binary search on a
   // too-long field yielded 6776 as the maximum working value.
   val MaxStringBytes = 6776
+  var stack = List[StackFrame]()
 
   def startMessage {}
+
   def endMessage {}
+
   def startGroup {}
+
   def endGroup {}
 
   def startField(field: String, index: Int) {
@@ -53,18 +45,6 @@ class FlatConsumer(output: Group, separator: String, renameId: Boolean) extends 
     stack = stack.tail
   }
 
-  def addInteger(value: Int) {
-    writeField{Binary.fromString(value.toString)}{name => output.add(name, value)}
-  }
-
-  def addLong(value: Long) {
-    writeField{Binary.fromString(value.toString)}{name => output.add(name, value)}
-  }
-
-  def addBoolean(value: Boolean) {
-    writeField{Binary.fromString(value.toString)}{name => output.add(name, value)}
-  }
-
   def truncate(value: Binary, length: Integer): Binary = {
     if (value.length <= length) {
       value
@@ -75,18 +55,44 @@ class FlatConsumer(output: Group, separator: String, renameId: Boolean) extends 
     }
   }
 
+  def addInteger(value: Int) {
+    writeField {
+      Binary.fromString(value.toString)
+    } { name => output.add(name, value) }
+  }
+
+  def addLong(value: Long) {
+    writeField {
+      Binary.fromString(value.toString)
+    } { name => output.add(name, value) }
+  }
+
+  def addBoolean(value: Boolean) {
+    writeField {
+      Binary.fromString(value.toString)
+    } { name => output.add(name, value) }
+  }
+
   def addBinary(value: Binary) {
     // Truncate strings so Impala doesn't break
     val truncated = truncate(value, MaxStringBytes)
-    writeField(truncated){name => output.add(name, truncated)}
+    writeField(truncated) { name => output.add(name, truncated) }
   }
 
   def addFloat(value: Float) {
-    writeField{Binary.fromString(value.toString)}{name => output.add(name, value)}
+    writeField {
+      Binary.fromString(value.toString)
+    } { name => output.add(name, value) }
   }
 
-  def addDouble(value: Double) {
-    writeField{Binary.fromString(value.toString)}{name => output.add(name, value)}
+  def writeField(binRep: => Binary)(fn: String => Unit) {
+    withField { name =>
+      val fieldType = output.getType.getType(name)
+      if (fieldType.asInstanceOf[PrimitiveType].getPrimitiveTypeName == PrimitiveType.PrimitiveTypeName.BINARY)
+        stack.head.values ::= binRep
+      else
+        fn(name)
+    }
   }
 
   def withField(fn: String=>Unit) {
@@ -100,13 +106,11 @@ class FlatConsumer(output: Group, separator: String, renameId: Boolean) extends 
       fn(name)
   }
 
-  def writeField(binRep: =>Binary)(fn: String => Unit) {
-    withField{name =>
-      val fieldType = output.getType.getType(name)
-      if(fieldType.asInstanceOf[PrimitiveType].getPrimitiveTypeName == PrimitiveType.PrimitiveTypeName.BINARY)
-        stack.head.values ::= binRep
-      else
-        fn(name)
-    }
+  def addDouble(value: Double) {
+    writeField {
+      Binary.fromString(value.toString)
+    } { name => output.add(name, value) }
   }
+
+  case class StackFrame(field: String, var values: List[Binary])
 }

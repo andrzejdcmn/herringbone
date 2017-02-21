@@ -1,31 +1,22 @@
 package com.stripe.herringbone
 
-import com.stripe.herringbone.util.ParquetUtils
-
 import java.util.{List => JavaList}
-import java.io.DataOutput
-import java.io.DataInput
 
-import scala.collection.mutable.MutableList
-import scala.collection.JavaConverters._
-
-import org.apache.hadoop.conf.{Configuration,Configured}
-import org.apache.hadoop.fs.{FileSystem,Path}
-import org.apache.hadoop.mapreduce.{Job,Mapper}
+import com.stripe.herringbone.util.ParquetUtils
+import org.apache.hadoop.conf.{Configuration, Configured}
+import org.apache.hadoop.fs.Path
 import org.apache.hadoop.mapreduce.lib.input.FileInputFormat
 import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat
-import org.apache.hadoop.util.{Tool,ToolRunner}
-
-import org.codehaus.jackson.map.ObjectMapper
+import org.apache.hadoop.mapreduce.{Job, Mapper}
+import org.apache.hadoop.util.{Tool, ToolRunner}
+import org.apache.parquet.example.data.Group
+import org.apache.parquet.hadoop.api.WriteSupport.FinalizedWriteContext
+import org.apache.parquet.hadoop.api.{DelegatingWriteSupport, WriteSupport}
+import org.apache.parquet.hadoop.example.{GroupReadSupport, GroupWriteSupport}
+import org.apache.parquet.hadoop.{BadConfigurationException, ParquetInputFormat, ParquetOutputFormat}
 import org.codehaus.jackson.`type`.TypeReference
-
+import org.codehaus.jackson.map.ObjectMapper
 import org.rogach.scallop.ScallopConf
-
-import parquet.example.data.{Group,GroupWriter}
-import parquet.hadoop.{BadConfigurationException,ParquetInputFormat,ParquetOutputFormat}
-import parquet.hadoop.api.{DelegatingWriteSupport,WriteSupport}
-import parquet.hadoop.api.WriteSupport.FinalizedWriteContext
-import parquet.hadoop.example.{GroupReadSupport,GroupWriteSupport}
 
 class ParquetCompactConf(arguments: Seq[String]) extends ScallopConf(arguments) {
   val inputPath = opt[String](required = true)
@@ -40,10 +31,6 @@ class ParquetCompactWriteSupport extends DelegatingWriteSupport[Group](new Group
     super.init(configuration)
   }
 
-  override def finalizeWrite(): FinalizedWriteContext = {
-    new FinalizedWriteContext(extraMetadata)
-  }
-
   def extractMetadata(configuration: Configuration) = {
     val metadataJson = configuration.get(ParquetCompactWriteSupport.ExtraMetadataKey)
     try {
@@ -51,6 +38,10 @@ class ParquetCompactWriteSupport extends DelegatingWriteSupport[Group](new Group
     } catch { case e: java.io.IOException =>
       throw new BadConfigurationException("Unable to deserialize extra extra metadata: " + metadataJson, e)
     }
+  }
+
+  override def finalizeWrite(): FinalizedWriteContext = {
+    new FinalizedWriteContext(extraMetadata)
   }
 }
 
@@ -91,7 +82,7 @@ class CompactJob extends Configured with Tool {
     job.setJarByClass(classOf[CompactJob])
     job.getConfiguration.setBoolean("mapreduce.job.user.classpath.first", true)
     job.getConfiguration.setBoolean(ParquetOutputFormat.ENABLE_JOB_SUMMARY, false)
-    job.getConfiguration.setBoolean(ParquetInputFormat.TASK_SIDE_METADATA, false);
+    job.getConfiguration.setBoolean(ParquetInputFormat.TASK_SIDE_METADATA, false)
     job.setNumReduceTasks(0)
 
     if(job.waitForCompletion(true)) 0 else 1

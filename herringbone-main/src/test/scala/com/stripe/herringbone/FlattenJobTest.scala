@@ -1,9 +1,9 @@
 package com.stripe.herringbone.test
 
 import com.stripe.herringbone.flatten._
+import org.apache.parquet.example.Paper
+import org.apache.parquet.io.api.Binary
 import org.scalatest._
-import parquet.example.Paper
-import parquet.io.api.Binary
 
 class FlattenJobTest extends FlatSpec with Matchers {
   def toBinary(x: Array[Byte]) = Binary.fromByteArray(x)

@@ -1,23 +1,19 @@
 package com.stripe.herringbone
 
+import java.io.{DataInput, DataOutput}
 import java.util.{List => JavaList}
-import java.io.DataOutput
-import java.io.DataInput
 
-import scala.collection.mutable.MutableList
-import scala.collection.JavaConverters._
-import scala.collection.JavaConversions._
-
+import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.io.Writable
-import org.apache.hadoop.mapreduce.{InputSplit,Job,JobContext,Mapper,TaskAttemptContext}
-import org.apache.hadoop.mapreduce.lib.input.FileInputFormat
-import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat
-import parquet.hadoop.api.ReadSupport
-import parquet.hadoop.{ParquetInputFormat,ParquetInputSplit,ParquetOutputFormat,ParquetRecordReader}
-import parquet.hadoop.example.{ExampleOutputFormat,GroupReadSupport}
-import parquet.hadoop.util.ContextUtil
-import parquet.example.data.{Group,GroupWriter}
-import parquet.example.data.simple.SimpleGroup
+import org.apache.hadoop.mapreduce.{InputSplit, JobContext, TaskAttemptContext}
+import org.apache.parquet.example.data.Group
+import org.apache.parquet.hadoop.api.ReadSupport
+import org.apache.parquet.hadoop.example.GroupReadSupport
+import org.apache.parquet.hadoop.util.ContextUtil
+import org.apache.parquet.hadoop.{ParquetInputFormat, ParquetInputSplit, ParquetRecordReader}
+
+import scala.collection.JavaConverters._
+import scala.collection.mutable.MutableList
 
 
 class CompactInputFormat[T](readSupportClass: Class[_ <: ReadSupport[T]]) extends ParquetInputFormat[T](readSupportClass) {
@@ -30,14 +26,14 @@ class CompactInputFormat[T](readSupportClass: Class[_ <: ReadSupport[T]]) extend
     // chunks.  This is not actually reliable. Chunks can come back bigger than
     // 100MB, but it does limit the size of most chunks.
     val conf = ContextUtil.getConfiguration(context)
-    conf.set("mapred.max.split.size", (100 * 1024 * 1024).toString)
+    //    conf.set("mapred.max.split.size", (100 * 1024 * 1024).toString)
 
     val splits = super.getSplits(conf, getFooters(context)).asScala.toList
-    val m = if (splits.isEmpty) splits else mergeSplits(splits)
+    val m = if (splits.isEmpty) splits else mergeSplits(splits, conf)
     m.asInstanceOf[List[InputSplit]].asJava
   }
 
-  def mergeSplits(splits: List[ParquetInputSplit]): List[MergedInputSplit] = {
+  def mergeSplits(splits: List[ParquetInputSplit], conf: Configuration): List[MergedInputSplit] = {
     val sizes = splits.map { _.getLength }
     println(s"""${splits.length} initial splits were generated.
                 |  Max: ${mb(sizes.max)}
@@ -48,7 +44,9 @@ class CompactInputFormat[T](readSupportClass: Class[_ <: ReadSupport[T]]) extend
     var buckets = MutableList[MutableList[ParquetInputSplit]](MutableList(splits.head))
     splits.tail.foreach { split =>
       val bucket = buckets.minBy { b => b.map { _.getLength }.sum }
-      if ((split.getLength + bucket.map { _.getLength }.sum) < TARGET) {
+      if ((split.getLength + bucket.map {
+        _.getLength
+      }.sum) < conf.getInt("mapred.max.split.size", 1024)) {
         bucket += split
       } else {
         buckets += MutableList(split)
@@ -64,14 +62,6 @@ class CompactInputFormat[T](readSupportClass: Class[_ <: ReadSupport[T]]) extend
     buckets.map { b => new MergedInputSplit(b.toList) }.toList
   }
 
-  override def createRecordReader(split: InputSplit, context: TaskAttemptContext): MergedRecordReader[T] = {
-    val readSupport = ParquetInputFormat.getReadSupportInstance[T](ContextUtil.getConfiguration(context))
-    split match {
-      case s: MergedInputSplit => new MergedRecordReader[T](s, context, readSupport)
-      case _ => throw new Exception(s"Expected a MergedInputSplit. Found a $split.")
-    }
-  }
-
   // Helper for pretty-printing byte values.
   def mb(n: Double): String = {
     val K = 1024
@@ -82,14 +72,21 @@ class CompactInputFormat[T](readSupportClass: Class[_ <: ReadSupport[T]]) extend
     else if (n < G) f"${n / M}%.2fM"
     else f"${n / G}%.2fG"
   }
+
+  override def createRecordReader(split: InputSplit, context: TaskAttemptContext): MergedRecordReader[T] = {
+    val readSupport = ParquetInputFormat.getReadSupportInstance[T](ContextUtil.getConfiguration(context))
+    split match {
+      case s: MergedInputSplit => new MergedRecordReader[T](s, context, readSupport)
+      case _ => throw new Exception(s"Expected a MergedInputSplit. Found a $split.")
+    }
+  }
 }
 
 class MergedInputSplit(var splits: List[ParquetInputSplit]) extends InputSplit with Writable {
-  def this() = this(List())
-
   var splitNumber = 0
 
-  def currentSplit: ParquetInputSplit = splits(splitNumber)
+  def this() = this(List())
+
   def nextSplit: Option[ParquetInputSplit] = {
     if (splitNumber < splits.length - 1) {
       splitNumber += 1
@@ -98,6 +95,8 @@ class MergedInputSplit(var splits: List[ParquetInputSplit]) extends InputSplit w
       None
     }
   }
+
+  def currentSplit: ParquetInputSplit = splits(splitNumber)
 
   // write and readFields are paired for serialization/deserialization.
   override def write(out: DataOutput) = {

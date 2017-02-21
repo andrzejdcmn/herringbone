@@ -2,9 +2,9 @@ package com.stripe.herringbone.test.load
 
 import com.stripe.herringbone.load.{FieldUtils, HadoopFs, ImpalaHiveSchemaTypeMapper}
 import org.apache.hadoop.fs._
+import org.apache.parquet.schema.{PrimitiveType, Type}
 import org.scalamock.scalatest.MockFactory
 import org.scalatest._
-import parquet.schema.{PrimitiveType, Type}
 
 class FieldUtilsTest extends FlatSpec with Matchers with MockFactory {
 

@@ -1,24 +1,16 @@
 package com.stripe.herringbone
 
-import com.stripe.herringbone.flatten.{ParquetFlatConf,ParquetFlatMapper,TypeFlattener}
-import com.stripe.herringbone.flatten.FlatConverter
+import com.stripe.herringbone.flatten.{FlatConverter, ParquetFlatConf, ParquetFlatMapper, TypeFlattener}
 import com.stripe.herringbone.util.ParquetUtils
-
+import org.apache.hadoop.conf._
+import org.apache.hadoop.fs._
 import org.apache.hadoop.mapreduce._
 import org.apache.hadoop.mapreduce.lib.input._
 import org.apache.hadoop.mapreduce.lib.output._
 import org.apache.hadoop.util._
-import org.apache.hadoop.fs._
-import org.apache.hadoop.conf._
-
-import parquet.example.data._
-import parquet.example.data.simple._
-import parquet.hadoop._
-import parquet.hadoop.example._
-import parquet.io.api._
-import parquet.schema._
-
-import org.rogach.scallop._
+import org.apache.parquet.example.data._
+import org.apache.parquet.hadoop._
+import org.apache.parquet.hadoop.example._
 
 class FlattenMapper extends ParquetFlatMapper[Group] {
   def valueOut(value: Group) = {

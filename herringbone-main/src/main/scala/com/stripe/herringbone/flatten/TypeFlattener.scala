@@ -1,7 +1,9 @@
 package com.stripe.herringbone.flatten
 
-import parquet.schema._
-import java.util.{List=>JList}
+import java.util.{List => JList}
+
+import org.apache.parquet.schema._
+
 import scala.collection.JavaConverters._
 
 class TypeFlattener(separator: String, renameId: Boolean) extends TypeConverter[List[Type]] {
@@ -28,7 +30,7 @@ class TypeFlattener(separator: String, renameId: Boolean) extends TypeConverter[
         flatten(children)
     }
 
-    def convertMessageType(messageType: MessageType, children: JList[List[Type]]) = flatten(children)
+  def convertMessageType(messageType: MessageType, children: JList[List[Type]]) = flatten(children)
 
     def flatten(children: JList[List[Type]]) = children.asScala.flatten.toList
 }

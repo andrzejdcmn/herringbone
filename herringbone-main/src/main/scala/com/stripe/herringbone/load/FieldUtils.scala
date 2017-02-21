@@ -1,12 +1,10 @@
 package com.stripe.herringbone.load
 
 import com.stripe.herringbone.util.ParquetUtils
-
 import org.apache.hadoop.fs._
-
-import parquet.schema.{ PrimitiveType, Type }
-import parquet.schema.PrimitiveType.PrimitiveTypeName
-import parquet.schema.PrimitiveType.PrimitiveTypeName._
+import org.apache.parquet.schema.PrimitiveType.PrimitiveTypeName
+import org.apache.parquet.schema.PrimitiveType.PrimitiveTypeName._
+import org.apache.parquet.schema.{PrimitiveType, Type}
 
 import scala.collection.JavaConversions._
 

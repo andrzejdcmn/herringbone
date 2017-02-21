@@ -1,8 +1,8 @@
 package com.stripe.herringbone.flatten
 
 import org.apache.hadoop.mapreduce.Mapper
-import parquet.example.data.Group
-import parquet.schema.{MessageType,MessageTypeParser}
+import org.apache.parquet.example.data.Group
+import org.apache.parquet.schema.{MessageType, MessageTypeParser}
 
 abstract class ParquetFlatMapper[ValueOut] extends Mapper[Void,Group,Void,ValueOut] {
   var flattenedSchema: MessageType = _
